@@ -1,0 +1,357 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Weather Alert Tracker API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: alerts
+    description: Weather alert operations
+  - name: status
+    description: Server status operations
+paths:
+  /weather/warnings:
+    get:
+      operationId: getWarnings
+      tags: [alerts]
+      summary: Active warnings for the selected notification area
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          schema: { type: string, enum: [CT, US] }
+      responses:
+        "200":
+          description: Actual NWS warnings; watches and advisories are not included
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WarningFeed" }
+        "400":
+          description: Invalid scope
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "502":
+          description: Warning feed unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /weather/alert-map:
+    get:
+      operationId: getAlertMap
+      tags: [alerts]
+      summary: Official NWS hazard polygons intersecting the map
+      parameters:
+        - { name: west, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+        - { name: south, in: query, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { name: east, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+        - { name: north, in: query, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+      responses:
+        "200":
+          description: Active county, forecast-zone and storm hazard areas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertMap" }
+        "400":
+          description: Invalid bounds
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "502":
+          description: NWS map feed unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /weather/location-alerts:
+    get:
+      operationId: getLocationAlerts
+      tags: [alerts]
+      summary: All active NWS alerts for a clicked location
+      parameters:
+        - { name: latitude, in: query, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { name: longitude, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+      responses:
+        "200":
+          description: Official alert details at the selected point
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LocationAlerts" }
+        "400":
+          description: Invalid location
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "502":
+          description: NWS alert feed unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /weather/lightning:
+    get:
+      operationId: getLightning
+      tags: [alerts]
+      summary: Recent observed GOES-East GLM lightning flash centroids
+      description: Rolling five-minute satellite observations, refreshed every 20 seconds. Includes cloud flashes; these are not exact ground-strike locations.
+      responses:
+        "200":
+          description: Actual NOAA satellite flash observations and their freshness
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LightningFeed" }
+        "502":
+          description: Satellite lightning feed unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /alerts:
+    get:
+      operationId: getAlerts
+      tags: [alerts]
+      summary: Get current weather alerts
+      description: Fetches and returns current weather alerts from weather.gov
+      responses:
+        "200":
+          description: List of current weather alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WeatherAlert"
+        "500":
+          description: Error fetching alerts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /alerts/summary:
+    get:
+      operationId: getAlertSummary
+      tags: [alerts]
+      summary: Get alert summary statistics
+      description: Returns counts and breakdowns of current alerts by severity and type
+      responses:
+        "200":
+          description: Alert summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertSummary"
+
+  /status:
+    get:
+      operationId: getStatus
+      tags: [status]
+      summary: Get server status
+      description: Returns server status including Discord webhook configuration and last check time
+      responses:
+        "200":
+          description: Server status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerStatus"
+
+components:
+  schemas:
+    WarningFeed:
+      type: object
+      required: [scope, checkedAt, warnings]
+      properties:
+        scope: { type: string, enum: [CT, US] }
+        checkedAt: { type: string }
+        warnings:
+          type: array
+          items: { $ref: "#/components/schemas/WeatherAlert" }
+    HazardGeometry:
+      type: object
+      required: [type, coordinates]
+      properties:
+        type: { type: string, enum: [Polygon, MultiPolygon] }
+        coordinates:
+          type: array
+          items: {}
+    HazardProperties:
+      type: object
+      required: [id, event, color, onset, expires, office]
+      properties:
+        id: { type: string }
+        event: { type: string }
+        color: { type: string }
+        onset: { type: ["string", "null"] }
+        expires: { type: ["string", "null"] }
+        office: { type: ["string", "null"] }
+    HazardFeature:
+      type: object
+      required: [type, id, geometry, properties]
+      properties:
+        type: { type: string, enum: [Feature] }
+        id: { type: string }
+        geometry: { $ref: "#/components/schemas/HazardGeometry" }
+        properties: { $ref: "#/components/schemas/HazardProperties" }
+    AlertMap:
+      type: object
+      required: [type, features, checkedAt, source, truncated]
+      properties:
+        type: { type: string, enum: [FeatureCollection] }
+        features:
+          type: array
+          items: { $ref: "#/components/schemas/HazardFeature" }
+        checkedAt: { type: string }
+        source: { type: string }
+        truncated: { type: boolean }
+    LocationAlerts:
+      type: object
+      required: [latitude, longitude, checkedAt, alerts]
+      properties:
+        latitude: { type: number }
+        longitude: { type: number }
+        checkedAt: { type: string }
+        alerts:
+          type: array
+          items: { $ref: "#/components/schemas/WeatherAlert" }
+    LightningFlash:
+      type: object
+      required: [id, latitude, longitude, time]
+      properties:
+        id: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        time: { type: string }
+    LightningFeed:
+      type: object
+      required: [source, fetchedAt, dataThrough, windowStart, latencySeconds, flashes]
+      properties:
+        source: { type: string }
+        fetchedAt: { type: string }
+        dataThrough: { type: string }
+        windowStart: { type: string }
+        latencySeconds: { type: number }
+        flashes:
+          type: array
+          items: { $ref: "#/components/schemas/LightningFlash" }
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    WeatherAlert:
+      type: object
+      required:
+        - id
+        - event
+        - headline
+        - severity
+        - urgency
+        - certainty
+        - areaDesc
+        - status
+        - messageType
+        - isNew
+      properties:
+        id:
+          type: string
+        event:
+          type: string
+        headline:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        instruction:
+          type: ["string", "null"]
+        severity:
+          type: string
+        urgency:
+          type: string
+        certainty:
+          type: string
+        areaDesc:
+          type: string
+        onset:
+          type: ["string", "null"]
+        expires:
+          type: ["string", "null"]
+        effective:
+          type: ["string", "null"]
+        status:
+          type: string
+        messageType:
+          type: string
+        senderName:
+          type: ["string", "null"]
+        isNew:
+          type: boolean
+
+    AlertSummary:
+      type: object
+      required:
+        - total
+        - warnings
+        - watches
+        - advisories
+        - emergencies
+        - byEvent
+      properties:
+        total:
+          type: integer
+        warnings:
+          type: integer
+        watches:
+          type: integer
+        advisories:
+          type: integer
+        emergencies:
+          type: integer
+        byEvent:
+          type: object
+          additionalProperties:
+            type: integer
+
+    ServerStatus:
+      type: object
+      required:
+        - discordConfigured
+        - alertSourceUrl
+        - checkIntervalSeconds
+      properties:
+        discordConfigured:
+          type: boolean
+        lastCheckAt:
+          type: ["string", "null"]
+        totalAlertsSeen:
+          type: integer
+        alertSourceUrl:
+          type: string
+        checkIntervalSeconds:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string

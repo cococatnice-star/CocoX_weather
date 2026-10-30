@@ -1,0 +1,7 @@
+.wx-radar-frame {
+  transition: opacity 260ms linear;
+  will-change: opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wx-radar-frame { transition: none; }
+}
