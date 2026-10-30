@@ -1,6 +1,8 @@
+
 import { useState } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { setBaseUrl } from "@workspace/api-client-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
@@ -9,6 +11,9 @@ import { Dashboard } from "@/pages/dashboard";
 import { Status } from "@/pages/status";
 import { Settings } from "@/pages/settings";
 import { AlertSettingsProvider } from "@/lib/alert-settings";
+
+// Connect frontend to the deployed Render API.
+setBaseUrl("https://cocox-weather.onrender.com");
 
 const queryClient = new QueryClient();
 
@@ -40,15 +45,15 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AlertSettingsProvider>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router 
-            hasSevereAlerts={hasSevereAlerts}
-            setHasSevereAlerts={setHasSevereAlerts}
-          />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router
+              hasSevereAlerts={hasSevereAlerts}
+              setHasSevereAlerts={setHasSevereAlerts}
+            />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
       </AlertSettingsProvider>
     </QueryClientProvider>
   );
